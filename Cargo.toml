@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+    "sabitsuku-d3d",
+    "injector-example"
+]
