@@ -9,7 +9,7 @@ included for Linux.
 1. Create a class library project for use as your entry point, and add `<GenerateRuntimeConfigurationFiles>True</GenerateRuntimeConfigurationFiles>` to the csproj to properly generate the runtime configuration. 
 2. The entry point in .NET must always have the signature `public static int Main(IntPtr args, int sizeBytes)`. 
 3. Create a `kaku.co` file, see [Configuration](#configuration) for syntax, and add it to your project.
-4. Add a prebuilt binary of `sabinokaku_win.dll`, or `sabinokaku_linux.so` on Linux.
+4. Add a prebuilt binary of `kaku.dll` on Windows, or `libkaku.so` on Linux.
 
 Your csproj should have the following entries.
 
@@ -21,18 +21,18 @@ Your csproj should have the following entries.
   <None Update="kaku.co">
     <CopyToOutputDirectory>Always</CopyToOutputDirectory>
   </None>
-  <None Update="sabinokaku_win.dll">
+  <None Update="kaku.dll">
     <CopyToOutputDirectory>Always</CopyToOutputDirectory>
   </None>
   
   <!-- Linux only -->
-  <None Update="sabinokaku_linux.so">
+  <None Update="libkaku.so">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
   </None>
 </ItemGroup>
 ```
 
-5. On Windows, inject `sabinokaku_win.dll` with `LoadLibraryW`. On Linux, use `LD_PRELOAD` to inject `sabinokaku_linux.so`.
+5. On Windows, inject `kaku.dll` with a DLL injection tool such as [Reloaded.Injector](https://github.com/Reloaded-Project/Reloaded.Injector). On Linux, use `LD_PRELOAD` to inject `libkaku.so`.
    On load, the CLR will be bootstrapped on a separate thread and your entry point function will be called.
 
 Note that the lifetime of the host process *always* outlives the lifetime of the .NET Runtime thread. If the host process
@@ -43,10 +43,10 @@ zombie processes. If there seems to be such a need, please file an issue; I will
  
 ## Configuration
 
-To determine the .NET bootstrap point, sabinokaku requires a `kaku.co` file either in the same directory as `sabinokaku_win.dll`/`sabinokaku_linux.so`, or in the host process directory.
+To determine the .NET bootstrap point, sabinokaku requires a `kaku.co` file either in the same directory as `kaku.dll`/`libkaku.so`, or in the host process directory.
 There are 2 formats that sabinokaku understands. The long format (`kaku_l`) allows for the most flexibility if you have weird AssemblyConfig options, but the short format is generally preferred. 
 
-### Long format example
+### Long Format Preamble
 The long format always begins with `kaku_l`, followed by the relative path to `runtimeconfig.json`, the relative path to the .NET assembly DLL, the qualified name of the entry-point class, and the name of the entry-point function.
 
 ```
@@ -57,10 +57,31 @@ TestInject.EntryPoint, TestInject
 Main
 ```
 
-### Short format example
+### Short Format Preamble
 The short format always begins with `kaku_s`. Information is then inferred with the syntax `AssemblyName::QualifiedClassName$EntryFunction`
 
 ```
 kaku_s
 TestInject::TestInject.EntryPoint$Main
 ```
+
+### Setting Environment Variables
+After the long or short format preamble, you may provide **optional** environment variables to be set before hostfxr is invoked and the .NET runtime is bootstrapped.
+The format is `env KEY=VAR`, be sure there are no spaces between the equals symbol or it will be taken as part of the environment string.
+
+For example, to set `DOTNET_MULTILEVEL_LOOKUP=0`, an example `kaku.co` may be
+```
+kaku_s
+TestInject::TestInject.EntryPoint$Main
+env DOTNET_MULTILEVEL_LOOKUP=0
+```
+
+Multiple environment variables can be set.
+```
+kaku_s
+TestInject::TestInject.EntryPoint$Main
+env DOTNET_MULTILEVEL_LOOKUP=0
+env COMPLUS_ForceENC=1
+```
+Note that any set variables will also take effect against the hosting process after initialization. sabinokaku will not restore the prior values, so use this feature
+with caution.

@@ -1,5 +1,6 @@
 use std::env::current_exe;
 use std::error::Error;
+use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 use std::str::{FromStr, Lines};
@@ -12,6 +13,7 @@ pub struct LoadConfig {
     pub type_name: PdCString,
     pub entry_method: PdCString,
     pub entry_assembly: PdCString,
+    pub env_vars: Vec<(OsString, OsString)>,
 }
 
 #[derive(Debug)]
@@ -58,8 +60,9 @@ impl Display for ConfigError {
 impl Error for ConfigError {}
 
 impl LoadConfig {
-    pub fn new(runtime_config: PdCString, entry_assembly: PdCString, type_name: PdCString, entry_method: PdCString) -> LoadConfig {
-        LoadConfig { runtime_config, type_name, entry_method, entry_assembly }
+    pub fn new(runtime_config: PdCString, entry_assembly: PdCString, type_name: PdCString, entry_method: PdCString,
+               env_vars: Vec<(OsString, OsString)>) -> LoadConfig {
+        LoadConfig { runtime_config, type_name, entry_method, entry_assembly, env_vars }
     }
 
     pub fn try_parse(root: PathBuf, input: String) -> Result<LoadConfig, Box<dyn Error>> {
@@ -95,12 +98,14 @@ impl LoadConfig {
 
         let mut assembly_fname_path = PathBuf::from(root);
         assembly_fname_path.push(assembly_fname);
+        let envvars = Self::parse_env(&lines[4..]);
 
         Ok(LoadConfig::new(
             PdCString::from_os_str(runtime_config_path.as_os_str())?,
             PdCString::from_os_str(assembly_fname_path.as_os_str())?,
             PdCString::from_str(entry_type)?,
             PdCString::from_str(entry_fn)?,
+            envvars
         ))
     }
 
@@ -117,11 +122,28 @@ impl LoadConfig {
         let mut assembly_fname_path = PathBuf::from(root);
         assembly_fname_path.push(&format!("{}.dll", asm));
 
+        let lines: Vec<&str> = input.collect();
+        let envvars = Self::parse_env(&lines);
+
         Ok(LoadConfig::new(
             PdCString::from_os_str(runtime_config_path.as_os_str())?,
             PdCString::from_os_str(assembly_fname_path.as_os_str())?,
             PdCString::from_str(&format!("{}, {}", entry_cls, asm))?,
             PdCString::from_str(entry_fn)?,
+            envvars
         ))
+    }
+
+    fn parse_env(input: &[&str]) -> Vec<(OsString, OsString)> {
+        let mut vars = Vec::new();
+
+        for line in input {
+            if !line.starts_with("env ") { continue; }
+            let line = &line["env ".len()..];
+            if let Some((k, v)) = line.split_once("=") {
+                vars.push((OsString::from(k), OsString::from(v)))
+            }
+        }
+        vars
     }
 }

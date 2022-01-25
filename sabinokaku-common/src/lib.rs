@@ -12,6 +12,9 @@ pub mod prelude {
 }
 
 pub fn init_clr(config: LoadConfig) -> Result<i32, Box<dyn Error>> {
+    for (key, value) in config.env_vars {
+        std::env::set_var(key, value);
+    }
     let hostfxr = nethost::load_hostfxr()?;
     let context = hostfxr.initialize_for_runtime_config(&config.runtime_config)?;
     let loader = context.get_delegate_loader_for_assembly(&config.entry_assembly)?;

@@ -2,6 +2,15 @@
 name = "sabinokaku-common"
 version = "0.1.0"
 edition = "2021"
+authors = [
+    "Ronny Chan <ronny@ronnychan.ca>"
+]
+license = "MIT"
+readme = "../README.md"
+categories = ["api-bindings", "external-ffi-bindings"]
+keywords = ["dotnet", "coreclr", "bindings", "inject", "dll"]
+repository = "https://github.com/SnowflakePowered/sabinokaku"
+description = "Support library and core logic for sabinokaku."
 
 [dependencies]
 netcorehost = "0.7.3"
