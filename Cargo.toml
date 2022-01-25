@@ -2,7 +2,13 @@
 
 members = [
     "injector-example",
-    "sabinokaku-win",
-    "sabinokaku-linux",
+    "sabinokaku-loader",
     "sabinokaku-common"
 ]
+
+[profile.release]
+panic = "abort"
+opt-level = 'z'
+lto = true
+codegen-units = 1
+strip = 'debuginfo'

@@ -1,9 +1,5 @@
-#![crate_type = "cdylib"]
 #![cfg(all(target_os = "windows"))]
-
-use std::error::Error;
 use std::ffi::OsString;
-use std::io::Read;
 use std::os::windows::ffi::OsStringExt;
 use std::path::PathBuf;
 
@@ -14,9 +10,9 @@ use winapi::um::libloaderapi::{DisableThreadLibraryCalls, GET_MODULE_HANDLE_EX_F
                                GetModuleFileNameW, GetModuleHandleExW};
 use winapi::um::winnt::DLL_PROCESS_ATTACH;
 
-use sabinokaku_common::prelude::*;
+use sabinokaku_common::config::ConfigSearchPath;
 
-struct WindowsConfigSearchPath;
+pub struct WindowsConfigSearchPath;
 impl ConfigSearchPath for WindowsConfigSearchPath {
     fn get_module_path() -> Option<PathBuf> {
         let mut module_handle: HMODULE = std::ptr::null_mut();
@@ -43,16 +39,6 @@ impl ConfigSearchPath for WindowsConfigSearchPath {
     }
 }
 
-/// Called when the DLL is attached to the process.
-fn main() -> Result<i32, Box<dyn Error>> {
-    let cfg_path = WindowsConfigSearchPath::search_for_config()?;
-    let mut file = std::fs::File::open(&cfg_path)?;
-    let mut cfg_string = String::new();
-    file.read_to_string(&mut cfg_string)?;
-    let config = LoadConfig::try_parse(cfg_path, cfg_string)?;
-    Ok(sabinokaku_common::init_clr(config)?)
-}
-
 #[no_mangle]
 #[allow(non_snake_case)]
 pub unsafe extern "system" fn DllMain(
@@ -64,7 +50,7 @@ pub unsafe extern "system" fn DllMain(
 
     if call_reason == DLL_PROCESS_ATTACH {
         std::thread::spawn(|| {
-            match main() {
+            match crate::main() {
                 Ok(i) => i as u32,
                 Err(e) => {
                     winapi::um::consoleapi::AllocConsole();

@@ -1,10 +1,5 @@
-#![crate_type = "cdylib"]
 #![cfg(all(target_os = "linux"))]
-#![feature(once_cell)]
-
-use std::error::Error;
 use std::ffi::{c_void, CStr, OsString};
-use std::io::Read;
 use std::lazy::OnceCell;
 use std::mem::MaybeUninit;
 use std::os::unix::ffi::OsStringExt;
@@ -12,10 +7,9 @@ use std::path::PathBuf;
 
 use libc::{c_char, c_int};
 
-use sabinokaku_common::prelude::*;
+use sabinokaku_common::config::ConfigSearchPath;
 
-struct LinuxConfigSearchPath;
-
+pub struct LinuxConfigSearchPath;
 impl ConfigSearchPath for LinuxConfigSearchPath {
     fn get_module_path() -> Option<PathBuf> {
         let mut dlinfo = MaybeUninit::<libc::Dl_info>::uninit();
@@ -32,16 +26,6 @@ impl ConfigSearchPath for LinuxConfigSearchPath {
     }
 }
 
-/// Called when the DLL is attached to the process.
-fn main() -> Result<i32, Box<dyn Error>> {
-    let cfg_path = LinuxConfigSearchPath::search_for_config()?;
-    let mut file = std::fs::File::open(&cfg_path)?;
-    let mut cfg_string = String::new();
-    file.read_to_string(&mut cfg_string)?;
-    let config = LoadConfig::try_parse(cfg_path, cfg_string)?;
-    Ok(init_clr(config)?)
-}
-
 type FnMain = unsafe extern "system" fn(c_int, *mut *mut c_char, *mut *mut c_char) -> c_int;
 type FnVoid = unsafe extern "system" fn();
 type FnLibcStartMain = unsafe extern "system" fn(FnMain, c_int, *mut *mut c_char, FnMain, FnVoid, FnVoid, *mut c_void) -> c_int;
@@ -54,7 +38,7 @@ static mut SAVED_MAIN: OnceCell<FnMain> = OnceCell::new();
 unsafe extern "system" fn thunked_main(argc: c_int, argv: *mut *mut c_char, envp: *mut *mut c_char) -> c_int {
     // We don't wait for the thread. This is consistent with windows behaviour.
     std::thread::spawn(|| {
-        match main() {
+        match crate::main() {
             Ok(i) => {
                 i as u32
             }
@@ -68,7 +52,10 @@ unsafe extern "system" fn thunked_main(argc: c_int, argv: *mut *mut c_char, envp
     let ret = if let Some(real_main) = SAVED_MAIN.get() {
         real_main(argc, argv, envp)
     } else {
-        0
+        // this should never happen but might as well exit if somehow we get launched into
+        // here without main.
+        eprintln!("No valid main entrypoint to inject into found.");
+        1
     };
 
     ret
@@ -86,6 +73,5 @@ pub unsafe extern "system" fn __libc_start_main(
 ) -> c_int {
     let origin_start: FnLibcStartMain = std::mem::transmute(libc::dlsym(libc::RTLD_NEXT, LIBC_START_MAIN.as_ptr() as *const c_char));
     SAVED_MAIN.get_or_init(move || main);
-
     return origin_start(thunked_main, argc, argv, init, fini, rtld_fini, stack_end);
 }

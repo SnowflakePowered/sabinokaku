@@ -1,0 +1,33 @@
+[package]
+name = "sabinokaku-loader"
+version = "0.1.0"
+edition = "2021"
+authors = ["Ronny Chan <ronny@ronnychan.ca>"]
+license = "MIT"
+readme = "../README.md"
+categories = ["api-bindings", "external-ffi-bindings"]
+keywords = ["dotnet", "coreclr", "bindings", "inject", "dll"]
+repository = "https://github.com/SnowflakePowered/sabinokaku"
+description = "Minimal framework for injecting the .NET runtime into processes."
+build = "build.rs"
+
+[dependencies]
+sabinokaku-common = { version = "0.1", path = "../sabinokaku-common" }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winapi = { version = "0.3", features = ["winuser", "consoleapi", "errhandlingapi"]}
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+
+[lib]
+name = "kaku"
+crate-type=["rlib", "cdylib"]
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1"
+
+[package.metadata.winres]
+OriginalFilename = "kaku.dll"
+FileDescription = "sabinokaku .NET Runtime Loader"
+ProductName = "sabinokaku"

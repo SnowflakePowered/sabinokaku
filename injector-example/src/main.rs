@@ -1,16 +1,18 @@
 #[cfg(all(target_os = "windows"))]
 use dll_syringe::{Syringe, Process};
+use std::env::args;
 
 #[cfg(all(target_os = "windows"))]
 fn main() {
-    let target_process = Process::find_first_by_name("notepad").unwrap();
+    let args: Vec<String> = args().collect();
+    let target_process = Process::find_first_by_name(&args[1]).unwrap();
     let syringe = Syringe::new();
-    syringe.inject(&target_process, r"D:\coding\sabitsuku\target\debug\sabinokaku_win.dll").unwrap();
+    syringe.inject(&target_process, &args[2]).unwrap();
 }
 
-#[cfg(all(target_os = "linux"))]
+#[cfg(not(target_os = "windows"))]
 use std::io::Read;
-#[cfg(all(target_os = "linux"))]
+#[cfg(not(target_os = "windows"))]
 fn main() {
     println!("Hello World");
     let _input = std::io::stdin()
