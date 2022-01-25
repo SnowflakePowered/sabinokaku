@@ -13,23 +13,23 @@ pub struct LoadConfig {
 }
 
 #[derive(Debug)]
-pub enum ClrError {
+pub enum ConfigError {
     MissingOrInvalidConfigMagic,
     InvalidConfig,
     MissingConfig,
 }
 
-impl Display for ClrError {
+impl Display for ConfigError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ClrError::MissingOrInvalidConfigMagic => write!(f, "Configuration file magic number is missing, should be kaku_l or kaku_s."),
-            ClrError::InvalidConfig => write!(f, "Configuration file is malformed."),
-            ClrError::MissingConfig => write!(f, "kaku.co fonfiguration file not found."),
+            ConfigError::MissingOrInvalidConfigMagic => write!(f, "Configuration file magic number is missing, should be kaku_l or kaku_s."),
+            ConfigError::InvalidConfig => write!(f, "Configuration file is malformed."),
+            ConfigError::MissingConfig => write!(f, "kaku.co fonfiguration file not found."),
         }
     }
 }
 
-impl Error for ClrError {
+impl Error for ConfigError {
 
 }
 
@@ -43,21 +43,21 @@ impl LoadConfig {
         match lines.next() {
             Some("kaku_s") => LoadConfig::parse_short(root, lines),
             Some("kaku_l") => LoadConfig::parse_long(root, lines),
-            _ => Err(Box::new(ClrError::MissingOrInvalidConfigMagic))
+            _ => Err(Box::new(ConfigError::MissingOrInvalidConfigMagic))
         }
     }
 
     fn parse_long(root: PathBuf, input: Lines) -> Result<LoadConfig, Box<dyn Error>> {
         let lines: Vec<&str> = input.collect();
         if lines.len() < 4 {
-            return Err(Box::new(ClrError::InvalidConfig))
+            return Err(Box::new(ConfigError::InvalidConfig))
         }
         let runtime_config = lines[0];
         let assembly_fname = lines[1];
         let entry_type = lines[2];
         let entry_fn = lines[3];
 
-        let root = root.parent().ok_or(ClrError::MissingConfig)?;
+        let root = root.parent().ok_or(ConfigError::MissingConfig)?;
 
         let mut runtime_config_path = PathBuf::from(root);
         runtime_config_path.push(runtime_config);
@@ -74,11 +74,11 @@ impl LoadConfig {
     }
 
     fn parse_short(root: PathBuf, mut input: Lines) -> Result<LoadConfig, Box<dyn Error>> {
-        let line = input.next().ok_or(ClrError::InvalidConfig)?;
-        let (asm, rest) = line.split_once("::").ok_or(ClrError::InvalidConfig)?;
-        let (entry_cls, entry_fn) = rest.split_once("$").ok_or(ClrError::InvalidConfig)?;
+        let line = input.next().ok_or(ConfigError::InvalidConfig)?;
+        let (asm, rest) = line.split_once("::").ok_or(ConfigError::InvalidConfig)?;
+        let (entry_cls, entry_fn) = rest.split_once("$").ok_or(ConfigError::InvalidConfig)?;
 
-        let root = root.parent().ok_or(ClrError::MissingConfig)?;
+        let root = root.parent().ok_or(ConfigError::MissingConfig)?;
 
         let mut runtime_config_path = PathBuf::from(root);
         runtime_config_path.push(&format!("{}.runtimeconfig.json", asm));

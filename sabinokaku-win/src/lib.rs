@@ -5,21 +5,23 @@ mod config;
 use std::ffi::{c_void, OsString};
 use std::error::Error;
 use std::io::Read;
+use std::env::current_exe;
+use std::os::windows::ffi::OsStringExt;
+use std::path::PathBuf;
+
 use netcorehost::nethost;
 use winapi::shared::minwindef::*;
 use winapi::shared::ntdef::*;
 
-use winapi::um::libloaderapi::{DisableThreadLibraryCalls, GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, GetModuleFileNameW, GetModuleHandleExW};
-use winapi::um::winnt::{DLL_PROCESS_ATTACH, DLL_PROCESS_DETACH};
+use winapi::um::libloaderapi::{DisableThreadLibraryCalls, GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+                               GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                               GetModuleFileNameW, GetModuleHandleExW};
 
+use winapi::um::winnt::DLL_PROCESS_ATTACH;
 use winapi::um::minwinbase::LPSECURITY_ATTRIBUTES;
 use winapi::um::processthreadsapi::CreateThread;
-use crate::config::{LoadConfig, ClrError};
-use std::env::current_exe;
-use std::os::windows::ffi::OsStringExt;
-use std::path::PathBuf;
-use winapi::um::synchapi::WaitForSingleObject;
-use winapi::um::winbase::INFINITE;
+
+use crate::config::{LoadConfig, ConfigError};
 
 unsafe fn get_module_path() -> Option<PathBuf> {
     let mut module_handle: HMODULE = std::ptr::null_mut();
@@ -57,7 +59,7 @@ fn search_for_config() -> Result<PathBuf, Box<dyn Error>> {
         }
     }
 
-    Err(Box::new(ClrError::MissingConfig))
+    Err(Box::new(ConfigError::MissingConfig))
 }
 
 /// Called when the DLL is attached to the process.
