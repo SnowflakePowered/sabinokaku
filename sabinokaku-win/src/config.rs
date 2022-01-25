@@ -14,7 +14,7 @@ pub struct LoadConfig {
 
 #[derive(Debug)]
 pub enum ConfigError {
-    MissingOrInvalidConfigMagic,
+    MissingOrInvalidConfigMagic(Option<String>),
     InvalidConfig,
     MissingConfig,
 }
@@ -22,7 +22,7 @@ pub enum ConfigError {
 impl Display for ConfigError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConfigError::MissingOrInvalidConfigMagic => write!(f, "Configuration file magic number is missing, should be kaku_l or kaku_s."),
+            ConfigError::MissingOrInvalidConfigMagic(s) => write!(f, "Configuration file magic number is missing, should be kaku_l or kaku_s, was {:?}.", s),
             ConfigError::InvalidConfig => write!(f, "Configuration file is malformed."),
             ConfigError::MissingConfig => write!(f, "kaku.co fonfiguration file not found."),
         }
@@ -39,11 +39,18 @@ impl LoadConfig {
     }
 
     pub fn try_parse(root: PathBuf, input: String) -> Result<LoadConfig, Box<dyn Error>> {
+        let mut input = input.as_str();
+
+        // deal with BOM.
+        if input.starts_with("\u{feff}") {
+            input = &input.trim_start_matches("\u{feff}");
+        }
+
         let mut lines = input.lines();
         match lines.next() {
             Some("kaku_s") => LoadConfig::parse_short(root, lines),
             Some("kaku_l") => LoadConfig::parse_long(root, lines),
-            _ => Err(Box::new(ConfigError::MissingOrInvalidConfigMagic))
+            x => Err(Box::new(ConfigError::MissingOrInvalidConfigMagic(x.map(String::from))))
         }
     }
 
