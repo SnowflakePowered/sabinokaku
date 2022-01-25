@@ -1,6 +1,6 @@
 [workspace]
 
 members = [
-    "sabitsuku-d3d",
-    "injector-example"
+    "injector-example",
+    "sabinokaku-win"
 ]

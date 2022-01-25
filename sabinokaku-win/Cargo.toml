@@ -1,0 +1,11 @@
+[package]
+name = "sabinokaku_win"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+detour = "0.8.0"
+winapi = { version = "0.3", features = ["winuser", "consoleapi", "errhandlingapi"]}
+netcorehost = "0.7.3"
+[lib]
+crate-type=["rlib", "cdylib"]
