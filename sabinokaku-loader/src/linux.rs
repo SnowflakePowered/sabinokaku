@@ -1,6 +1,6 @@
 #![cfg(all(target_os = "linux"))]
 use std::ffi::{c_void, CStr, OsString};
-use std::lazy::OnceCell;
+use std::lazy::SyncOnceCell;
 use std::mem::MaybeUninit;
 use std::os::unix::ffi::OsStringExt;
 use std::path::PathBuf;
@@ -13,7 +13,7 @@ pub struct LinuxConfigSearchPath;
 impl ConfigSearchPath for LinuxConfigSearchPath {
     fn get_module_path() -> Option<PathBuf> {
         let mut dlinfo = MaybeUninit::<libc::Dl_info>::uninit();
-        let slice = unsafe {
+        let module_fname = unsafe {
             if libc::dladdr(thunked_main as *const c_void, dlinfo.as_mut_ptr()) == 0 {
                 return None;
             }
@@ -21,21 +21,18 @@ impl ConfigSearchPath for LinuxConfigSearchPath {
             let fname = dlinfo.dli_fname;
             CStr::from_ptr(fname).to_owned()
         };
-        let os_str = OsString::from_vec(slice.into_bytes());
+        let os_str = OsString::from_vec(module_fname.into_bytes());
         PathBuf::from(os_str).canonicalize().ok()
     }
 }
 
-type FnMain = unsafe extern "system" fn(c_int, *mut *mut c_char, *mut *mut c_char) -> c_int;
-type FnVoid = unsafe extern "system" fn();
-type FnLibcStartMain = unsafe extern "system" fn(FnMain, c_int, *mut *mut c_char, FnMain, FnVoid, FnVoid, *mut c_void) -> c_int;
+type FnMain = extern "system" fn(c_int, *mut *mut c_char, *mut *mut c_char) -> c_int;
+type FnVoid = extern "system" fn();
+type FnLibcStartMain = extern "system" fn(FnMain, c_int, *mut *mut c_char, FnMain, FnVoid, FnVoid, *mut c_void) -> c_int;
 
 const LIBC_START_MAIN: &'static [u8] = b"__libc_start_main\0";
 
-// This is really bad...
-static mut SAVED_MAIN: OnceCell<FnMain> = OnceCell::new();
-
-unsafe extern "system" fn thunked_main(argc: c_int, argv: *mut *mut c_char, envp: *mut *mut c_char) -> c_int {
+extern "system" fn thunked_main(argc: c_int, argv: *mut *mut c_char, envp: *mut *mut c_char) -> c_int {
     // We don't wait for the thread. This is consistent with windows behaviour.
     std::thread::spawn(|| {
         match crate::main() {
@@ -61,8 +58,15 @@ unsafe extern "system" fn thunked_main(argc: c_int, argv: *mut *mut c_char, envp
     ret
 }
 
+// We need to save the original main function somehow.
+// While this is pretty bad, we can't really pass anything into FnLibcStartMain,
+// so this is the next best thing.
+//
+// SyncOnceCell is marginally safer than OnceCell and doesn't require static mut.
+static SAVED_MAIN: SyncOnceCell<FnMain> = SyncOnceCell::new();
+
 #[no_mangle]
-pub unsafe extern "system" fn __libc_start_main(
+pub extern "system" fn __libc_start_main(
     main: FnMain,
     argc: c_int,
     argv: *mut *mut c_char,
@@ -71,7 +75,9 @@ pub unsafe extern "system" fn __libc_start_main(
     rtld_fini: FnVoid,
     stack_end: *mut c_void,
 ) -> c_int {
-    let origin_start: FnLibcStartMain = std::mem::transmute(libc::dlsym(libc::RTLD_NEXT, LIBC_START_MAIN.as_ptr() as *const c_char));
+    let origin_start: FnLibcStartMain = unsafe {
+        std::mem::transmute(libc::dlsym(libc::RTLD_NEXT, LIBC_START_MAIN.as_ptr() as *const c_char))
+    };
     SAVED_MAIN.get_or_init(move || main);
     return origin_start(thunked_main, argc, argv, init, fini, rtld_fini, stack_end);
 }
