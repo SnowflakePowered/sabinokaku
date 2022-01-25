@@ -13,7 +13,11 @@ fn main() {
 use std::io::Read;
 #[cfg(not(target_os = "windows"))]
 fn main() {
+    use std::env::vars;
     println!("Hello World");
+    for (k, v) in vars() {
+        println!("{} {}", k, v);
+    }
     let _input = std::io::stdin()
         .bytes()
         .next()

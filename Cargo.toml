@@ -6,6 +6,10 @@ members = [
     "sabinokaku-common"
 ]
 
+[profile.dev]
+# Otherwise unhandled exception from .NET is undefined behaviour.
+panic = "abort"
+
 [profile.release]
 panic = "abort"
 opt-level = 'z'

@@ -20,7 +20,7 @@ pub struct LoadConfig {
 pub enum ConfigError {
     MissingOrInvalidConfigMagic(Option<String>),
     InvalidConfig,
-    MissingConfig,
+    MissingConfig
 }
 
 pub trait ConfigSearchPath {

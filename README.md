@@ -5,6 +5,21 @@ Minimal framework to inject the .NET Runtime into a process.
 Supports Windows and Linux. macOS support is possible via `LD_PRELOAD` but will require slightly different hooks than 
 included for Linux.
 
+## Building
+Building sabinokaku requires the nightly toolchain. The workspace Cargo.toml is preconfigured to strip debug symbols, 
+otherwise the Linux `kaku.so` binary will bloat from ~500KB to around 3MB large. 
+
+```
+$ cargo build --release
+```
+
+The `sabinokaku-common` module contains platform independent logic such as configuration parsing and bootstrapping `hostfxr` and `nethost`. 
+The `sabinokaku-loader` module contains the code for the actual injected assembly; this will be built as `cdylib` (`.dll` or `.so`), and is the
+actual assembly that has to be injected into the address space of the target process.
+
+`injector-example` is a simple dummy program that injects a DLL into a running process, or simply runs `Hello World` and 
+dumps environment variables for testing injection on Linux.
+
 ## Usage
 1. Create a class library project for use as your entry point, and add `<GenerateRuntimeConfigurationFiles>True</GenerateRuntimeConfigurationFiles>` to the csproj to properly generate the runtime configuration. 
 2. The entry point in .NET must always have the signature `public static int Main(IntPtr args, int sizeBytes)`. 
@@ -32,8 +47,10 @@ Your csproj should have the following entries.
 </ItemGroup>
 ```
 
-5. On Windows, inject `kaku.dll` with a DLL injection tool such as [Reloaded.Injector](https://github.com/Reloaded-Project/Reloaded.Injector). On Linux, use `LD_PRELOAD` to inject `libkaku.so`.
+5. On Windows, inject `kaku.dll` into a running process with a DLL injection tool such as [Reloaded.Injector](https://github.com/Reloaded-Project/Reloaded.Injector). 
+   On Linux, `libkaku.so` hooks `__libc_start_main` and can be injected with `LD_PRELOAD`.
    On load, the CLR will be bootstrapped on a separate thread and your entry point function will be called.
+
 
 Note that the lifetime of the host process *always* outlives the lifetime of the .NET Runtime thread. If the host process
 does not live long enough for the .NET Runtime to bootstrap and finish execution, it will be killed along with the host process. 
@@ -83,5 +100,21 @@ TestInject::TestInject.EntryPoint$Main
 env DOTNET_MULTILEVEL_LOOKUP=0
 env COMPLUS_ForceENC=1
 ```
-Note that any set variables will also take effect against the hosting process after initialization. sabinokaku will not restore the prior values, so use this feature
-with caution.
+
+⚠️**Warning**⚠️
+
+Any set variables will also take effect against the hosting process after initialization, and sabinokaku will not restore the prior values. 
+See [Platform Differences](#platform-differences) for more details.
+
+## Platform Differences
+Particularly when using the environment variables feature, note the differences in load order between Windows and Linux.
+
+Windows uses `DllMain` and thus the host process is already executing when the runtime is injected. Changed environment 
+variables will thus be visible to the host process only if they are read **after** initialization.
+
+Linux hooks `__libc_start_main` and bootstraps the .NET runtime **before** `main`, thus any environment variables set will **always** be visible
+to the target process `main`.
+
+On both platforms, .NET initialization and execution happens on a separate thread. 
+However, if an uncaught exception occurs it is not allowed to cross the FFI boundary. 
+To avoid undefined behaviour, the host application will be aborted.
