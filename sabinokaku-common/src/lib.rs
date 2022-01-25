@@ -1,12 +1,14 @@
 use std::error::Error;
+
 use netcorehost::nethost;
+
 use crate::config::LoadConfig;
 
 pub mod config;
 
 pub mod prelude {
-    pub use crate::init_clr;
     pub use crate::config::*;
+    pub use crate::init_clr;
 }
 
 pub fn init_clr(config: LoadConfig) -> Result<i32, Box<dyn Error>> {

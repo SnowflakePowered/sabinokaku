@@ -1,7 +1,9 @@
+use std::env::current_exe;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 use std::str::{FromStr, Lines};
+
 use netcorehost::pdcstring::PdCString;
 
 #[derive(Debug)]
@@ -19,6 +21,30 @@ pub enum ConfigError {
     MissingConfig,
 }
 
+pub trait ConfigSearchPath {
+    fn get_module_path() -> Option<PathBuf>;
+
+    fn search_for_config() -> Result<PathBuf, Box<dyn Error>> {
+        let module_parent = Self::get_module_path();
+        if let Some(Some(mut kaku_path)) = module_parent.map(|s| s.parent().map(PathBuf::from)) {
+            kaku_path.push("kaku.co");
+            if kaku_path.exists() {
+                return Ok(kaku_path);
+            }
+        }
+
+        if let Ok(Some(mut kaku_path)) = current_exe()
+            .map(|s| s.parent().map(PathBuf::from)) {
+            kaku_path.push("kaku.co");
+            if kaku_path.exists() {
+                return Ok(kaku_path);
+            }
+        }
+
+        Err(Box::new(ConfigError::MissingConfig))
+    }
+}
+
 impl Display for ConfigError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -29,9 +55,7 @@ impl Display for ConfigError {
     }
 }
 
-impl Error for ConfigError {
-
-}
+impl Error for ConfigError {}
 
 impl LoadConfig {
     pub fn new(runtime_config: PdCString, entry_assembly: PdCString, type_name: PdCString, entry_method: PdCString) -> LoadConfig {
@@ -57,7 +81,7 @@ impl LoadConfig {
     fn parse_long(root: PathBuf, input: Lines) -> Result<LoadConfig, Box<dyn Error>> {
         let lines: Vec<&str> = input.collect();
         if lines.len() < 4 {
-            return Err(Box::new(ConfigError::InvalidConfig))
+            return Err(Box::new(ConfigError::InvalidConfig));
         }
         let runtime_config = lines[0];
         let assembly_fname = lines[1];
@@ -75,8 +99,8 @@ impl LoadConfig {
         Ok(LoadConfig::new(
             PdCString::from_os_str(runtime_config_path.as_os_str())?,
             PdCString::from_os_str(assembly_fname_path.as_os_str())?,
-               PdCString::from_str(entry_type)?,
-             PdCString::from_str(entry_fn)?
+            PdCString::from_str(entry_type)?,
+            PdCString::from_str(entry_fn)?,
         ))
     }
 
@@ -96,8 +120,8 @@ impl LoadConfig {
         Ok(LoadConfig::new(
             PdCString::from_os_str(runtime_config_path.as_os_str())?,
             PdCString::from_os_str(assembly_fname_path.as_os_str())?,
-                                PdCString::from_str(&format!("{}, {}", entry_cls, asm))?,
-            PdCString::from_str(entry_fn)?
+            PdCString::from_str(&format!("{}, {}", entry_cls, asm))?,
+            PdCString::from_str(entry_fn)?,
         ))
     }
 }
