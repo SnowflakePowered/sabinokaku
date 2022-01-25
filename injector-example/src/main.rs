@@ -1,9 +1,8 @@
 #[cfg(all(target_os = "windows"))]
-use dll_syringe::{Syringe, Process};
-use std::env::args;
-
-#[cfg(all(target_os = "windows"))]
 fn main() {
+    use dll_syringe::{Syringe, Process};
+    use std::env::args;
+
     let args: Vec<String> = args().collect();
     let target_process = Process::find_first_by_name(&args[1]).unwrap();
     let syringe = Syringe::new();
