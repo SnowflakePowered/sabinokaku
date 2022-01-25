@@ -1,6 +1,5 @@
 #![crate_type = "cdylib"]
-
-mod config;
+#![cfg(all(target_os = "windows"))]
 
 use std::ffi::{c_void, OsString};
 use std::error::Error;
@@ -9,9 +8,9 @@ use std::env::current_exe;
 use std::os::windows::ffi::OsStringExt;
 use std::path::PathBuf;
 
-use netcorehost::nethost;
 use winapi::shared::minwindef::*;
 use winapi::shared::ntdef::*;
+use winapi::um::handleapi::CloseHandle;
 
 use winapi::um::libloaderapi::{DisableThreadLibraryCalls, GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
                                GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
@@ -21,7 +20,7 @@ use winapi::um::winnt::DLL_PROCESS_ATTACH;
 use winapi::um::minwinbase::LPSECURITY_ATTRIBUTES;
 use winapi::um::processthreadsapi::CreateThread;
 
-use crate::config::{LoadConfig, ConfigError};
+use sabinokaku_common::prelude::*;
 
 unsafe fn get_module_path() -> Option<PathBuf> {
     let mut module_handle: HMODULE = std::ptr::null_mut();
@@ -40,7 +39,7 @@ unsafe fn get_module_path() -> Option<PathBuf> {
 
     v.set_len(size as usize);
     let os_str = OsString::from_wide(&v);
-    Some(PathBuf::from(os_str))
+    PathBuf::from(os_str).canonicalize().ok()
 }
 
 fn search_for_config() -> Result<PathBuf, Box<dyn Error>> {
@@ -69,15 +68,7 @@ fn main() -> Result<i32, Box<dyn Error>> {
     let mut cfg_string = String::new();
     file.read_to_string(&mut cfg_string)?;
     let config = LoadConfig::try_parse(cfg_path, cfg_string)?;
-    Ok(init_clr(config)?)
-}
-
-fn init_clr(config: LoadConfig) -> Result<i32, Box<dyn Error>> {
-    let hostfxr = nethost::load_hostfxr()?;
-    let context = hostfxr.initialize_for_runtime_config(&config.runtime_config)?;
-    let loader = context.get_delegate_loader_for_assembly(&config.entry_assembly)?;
-    let init = loader.get_function_pointer_with_default_signature(config.type_name, config.entry_method)?;
-    Ok(unsafe { init(std::ptr::null(), 0) })
+    Ok(sabinokaku_common::init_clr(config)?)
 }
 
 #[no_mangle]
@@ -103,8 +94,8 @@ pub unsafe extern "system" fn DllMain(
     DisableThreadLibraryCalls(module);
 
     if call_reason == DLL_PROCESS_ATTACH {
-      CreateThread(0 as LPSECURITY_ATTRIBUTES, 0, Some(thunk_thread_main),
-                     0 as LPVOID, 0, 0 as LPDWORD);
+        CloseHandle(CreateThread(0 as LPSECURITY_ATTRIBUTES, 0, Some(thunk_thread_main),
+                     0 as LPVOID, 0, 0 as LPDWORD));
     }
     winapi::shared::minwindef::TRUE
 }

@@ -1,13 +1,15 @@
 # 錆の核 sabinokaku
 
-Minimal library to inject .NET CoreCLR into a process via DLL-main. 
-Windows only for now, Linux and macOS requires a slightly different approach with `LD_PRELOAD` that is not yet supported.
+Minimal framework to inject the .NET Runtime into a process.
+
+Supports Windows and Linux. macOS support is possible via `LD_PRELOAD` but will require slightly different hooks than 
+included for Linux.
 
 ## Usage
 1. Create a class library project for use as your entry point, and add `<GenerateRuntimeConfigurationFiles>True</GenerateRuntimeConfigurationFiles>` to the csproj to properly generate the runtime configuration. 
 2. The entry point in .NET must always have the signature `public static int Main(IntPtr args, int sizeBytes)`. 
 3. Create a `kaku.co` file, see [Configuration](#configuration) for syntax, and add it to your project.
-4. Add a prebuilt binary of `sabinokaku_win.dll`
+4. Add a prebuilt binary of `sabinokaku_win.dll`, or `sabinokaku_linux.so` on Linux.
 
 Your csproj should have the following entries.
 
@@ -22,14 +24,26 @@ Your csproj should have the following entries.
   <None Update="sabinokaku_win.dll">
     <CopyToOutputDirectory>Always</CopyToOutputDirectory>
   </None>
+  
+  <!-- Linux only -->
+  <None Update="sabinokaku_linux.so">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+  </None>
 </ItemGroup>
 ```
 
-5. Use the tool of your choice to inject `sabinokaku_win.dll`, which will automatically bootstrap the CLR, and call your entry point function. 
+5. On Windows, inject `sabinokaku_win.dll` with `LoadLibraryW`. On Linux, use `LD_PRELOAD` to inject `sabinokaku_linux.so`.
+   On load, the CLR will be bootstrapped on a separate thread and your entry point function will be called.
+
+Note that the lifetime of the host process *always* outlives the lifetime of the .NET Runtime thread. If the host process
+does not live long enough for the .NET Runtime to bootstrap and finish execution, it will be killed along with the host process. 
+
+Waiting for the thread to join before the process quits is doable, but not implemented since this leads to some unexpected behaviour such as
+zombie processes. If there seems to be such a need, please file an issue; I will consider making it configurable via `kaku.co`.
  
 ## Configuration
 
-To determine the .NET bootstrap point, sabinokaku requires a `kaku.co` file either in the same directory as `sabinokaku_win.dll`, or in the host process directory.
+To determine the .NET bootstrap point, sabinokaku requires a `kaku.co` file either in the same directory as `sabinokaku_win.dll`/`sabinokaku_linux.so`, or in the host process directory.
 There are 2 formats that sabinokaku understands. The long format (`kaku_l`) allows for the most flexibility if you have weird AssemblyConfig options, but the short format is generally preferred. 
 
 ### Long format example

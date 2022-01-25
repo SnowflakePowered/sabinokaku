@@ -1,11 +1,10 @@
 [package]
-name = "sabinokaku-win"
+name = "sabinokaku-linux"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-winapi = { version = "0.3", features = ["winuser", "consoleapi", "errhandlingapi"]}
+libc = "0.2"
 sabinokaku-common = { version = "0.1", path = "../sabinokaku-common" }
-
 [lib]
 crate-type=["rlib", "cdylib"]

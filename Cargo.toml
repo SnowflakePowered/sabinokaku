@@ -2,5 +2,7 @@
 
 members = [
     "injector-example",
-    "sabinokaku-win"
+    "sabinokaku-win",
+    "sabinokaku-linux",
+    "sabinokaku-common"
 ]

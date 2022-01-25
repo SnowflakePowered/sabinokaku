@@ -24,7 +24,7 @@ impl Display for ConfigError {
         match self {
             ConfigError::MissingOrInvalidConfigMagic(s) => write!(f, "Configuration file magic number is missing, should be kaku_l or kaku_s, was {:?}.", s),
             ConfigError::InvalidConfig => write!(f, "Configuration file is malformed."),
-            ConfigError::MissingConfig => write!(f, "kaku.co fonfiguration file not found."),
+            ConfigError::MissingConfig => write!(f, "kaku.co configuration file not found."),
         }
     }
 }

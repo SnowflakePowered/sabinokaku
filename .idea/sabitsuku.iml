@@ -5,6 +5,8 @@
       <sourceFolder url="file://$MODULE_DIR$/injector-example/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/sabitsuku-d3d/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/sabinokaku-win/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/sabinokaku-common/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/sabinokaku-linux/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />
