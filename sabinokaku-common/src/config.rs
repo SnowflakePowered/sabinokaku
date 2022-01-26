@@ -146,7 +146,7 @@ impl LoadConfig {
     fn parse_short(root: PathBuf, mut input: Lines) -> Result<LoadConfig, Box<dyn Error>> {
         let line = input.next().ok_or(ConfigError::InvalidConfig)?;
         let (asm, rest) = line.split_once("::").ok_or(ConfigError::InvalidConfig)?;
-        let (entry_cls, entry_fn) = rest.split_once("$").ok_or(ConfigError::InvalidConfig)?;
+        let (entry_cls, entry_fn) = rest.split_once("!").ok_or(ConfigError::InvalidConfig)?;
 
         let root = root.parent().ok_or(ConfigError::MissingConfig)?;
 

@@ -83,7 +83,7 @@ short format preamble requires that your assembly and runtime configuration file
 
 ```
 kaku_s
-TestInject::TestInject.EntryPoint$Main
+TestInject::TestInject.EntryPoint!Main
 ```
 ### Advanced Configuration
 
@@ -94,14 +94,14 @@ The format is `env KEY=VAR`, be sure there are no spaces between the equals symb
 For example, to set `DOTNET_MULTILEVEL_LOOKUP=0`, an example `kaku.co` may be
 ```
 kaku_s
-TestInject::TestInject.EntryPoint$Main
+TestInject::TestInject.EntryPoint!Main
 env DOTNET_MULTILEVEL_LOOKUP=0
 ```
 
 Multiple environment variables can be set.
 ```
 kaku_s
-TestInject::TestInject.EntryPoint$Main
+TestInject::TestInject.EntryPoint!Main
 env DOTNET_MULTILEVEL_LOOKUP=0
 env COMPLUS_ForceENC=1
 ```
@@ -119,7 +119,7 @@ relative to `kaku.co`.
 
 ```
 kaku_s
-TestInject::TestInject.EntryPoint$Main
+TestInject::TestInject.EntryPoint!Main
 hostfxr runtime/host/hostfxr.dll
 env DOTNET_MULTILEVEL_LOOKUP=0
 ```
@@ -133,7 +133,7 @@ runtime, relative to `kaku.co`. Be sure to set `DOTNET_MULTILEVEL_LOOKUP=0` as w
 
 ```
 kaku_s
-TestInject::TestInject.EntryPoint$Main
+TestInject::TestInject.EntryPoint!Main
 dotnetroot runtime
 env DOTNET_MULTILEVEL_LOOKUP=0
 ```
