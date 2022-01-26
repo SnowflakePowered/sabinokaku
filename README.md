@@ -60,11 +60,14 @@ zombie processes. If there seems to be such a need, please file an issue; I will
  
 ## Configuration
 
-To determine the .NET bootstrap point, sabinokaku requires a `kaku.co` file either in the same directory as `kaku.dll`/`libkaku.so`, or in the host process directory.
-There are 2 formats that sabinokaku understands. The long format (`kaku_l`) allows for the most flexibility if you have weird AssemblyConfig options, but the short format is generally preferred. 
+To determine the .NET bootstrap point, sabinokaku requires a `kaku.co` file either in the same directory as `kaku.dll`/`libkaku.so`, 
+or in the host process directory. There are 2 formats that sabinokaku understands. The long format (`kaku_l`) allows for the most flexibility
+if you have weird AssemblyConfig options, or store the .NET entry point in a child folder, but the short format is generally preferred. 
 
 ### Long Format Preamble
-The long format always begins with `kaku_l`, followed by the relative path to `runtimeconfig.json`, the relative path to the .NET assembly DLL, the qualified name of the entry-point class, and the name of the entry-point function.
+The long format always begins with `kaku_l`, followed by the path to `runtimeconfig.json`, the path to the .NET assembly DLL, 
+the qualified name of the entry-point class, and the name of the entry-point function. All paths are relative to the location of
+`kaku.co`.
 
 ```
 kaku_l
@@ -75,7 +78,8 @@ Main
 ```
 
 ### Short Format Preamble
-The short format always begins with `kaku_s`. Information is then inferred with the syntax `AssemblyName::QualifiedClassName$EntryFunction`
+The short format always begins with `kaku_s`. Information is then inferred with the syntax `AssemblyName::QualifiedClassName$EntryFunction`. The
+short format preamble requires that your assembly and runtime configuration file is in the same folder as `kaku.co`.
 
 ```
 kaku_s
