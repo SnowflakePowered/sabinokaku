@@ -2,8 +2,7 @@
 
 Minimal framework to inject the .NET Runtime into a process.
 
-Supports Windows and Linux. macOS support is possible via `LD_PRELOAD` but will require slightly different hooks than 
-included for Linux.
+Supports Windows and Linux. macOS support is complicated due to SIP, and will not be covered here.
 
 ## Building
 Building sabinokaku requires the nightly toolchain. The workspace Cargo.toml is preconfigured to strip debug symbols, 
