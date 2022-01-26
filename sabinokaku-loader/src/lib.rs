@@ -22,7 +22,7 @@ fn main() -> Result<i32, Box<dyn Error>> {
     let mut file = std::fs::File::open(&cfg_path)?;
     let mut cfg_string = String::new();
     file.read_to_string(&mut cfg_string)?;
-    let config = LoadConfig::try_parse(cfg_path, cfg_string)?;
+    let config = LoadConfig::try_parse(cfg_path, &cfg_string)?;
     Ok(sabinokaku_common::init_clr(config)?)
 }
 

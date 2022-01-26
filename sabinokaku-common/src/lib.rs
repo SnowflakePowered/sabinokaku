@@ -1,4 +1,5 @@
 use std::error::Error;
+use netcorehost::hostfxr::Hostfxr;
 
 use netcorehost::nethost;
 
@@ -15,7 +16,13 @@ pub fn init_clr(config: LoadConfig) -> Result<i32, Box<dyn Error>> {
     for (key, value) in config.env_vars {
         std::env::set_var(key, value);
     }
-    let hostfxr = nethost::load_hostfxr()?;
+
+    let hostfxr = if let Some(hostfxr_path) = config.hostfxr {
+        Hostfxr::load_from_path(hostfxr_path.as_os_str())?
+    } else {
+        nethost::load_hostfxr()?
+    };
+
     let context = hostfxr.initialize_for_runtime_config(&config.runtime_config)?;
     let loader = context.get_delegate_loader_for_assembly(&config.entry_assembly)?;
     let init = loader.get_function_pointer_with_default_signature(config.type_name, config.entry_method)?;

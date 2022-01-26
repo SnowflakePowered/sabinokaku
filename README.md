@@ -81,8 +81,9 @@ The short format always begins with `kaku_s`. Information is then inferred with 
 kaku_s
 TestInject::TestInject.EntryPoint$Main
 ```
+### Advanced Configuration
 
-### Setting Environment Variables
+#### Setting Environment Variables
 After the long or short format preamble, you may provide **optional** environment variables to be set before hostfxr is invoked and the .NET runtime is bootstrapped.
 The format is `env KEY=VAR`, be sure there are no spaces between the equals symbol or it will be taken as part of the environment string.
 
@@ -101,10 +102,25 @@ env DOTNET_MULTILEVEL_LOOKUP=0
 env COMPLUS_ForceENC=1
 ```
 
+The order of environment variables set is **not guaranteed**.
+
 ⚠️**Warning**⚠️
 
 Any set variables will also take effect against the hosting process after initialization, and sabinokaku will not restore the prior values. 
 See [Platform Differences](#platform-differences) for more details.
+
+#### Providing your own `hostfxr.dll`
+After the preamble, but **before** any environment variables, you may **optionally** provide the path to your own `hostfxr.dll`, which is resolved
+relative to `kaku.co`.
+
+```
+kaku_s
+TestInject::TestInject.EntryPoint$Main
+hostfxr runtime/host/hostfxr.dll
+env DOTNET_MULTILEVEL_LOOKUP=0
+```
+
+sabinokaku will then try to load using your custom `hostfxr.dll`. If it does not exist, the runtime will fail to bootstrap.
 
 ## Platform Differences
 Particularly when using the environment variables feature, note the differences in load order between Windows and Linux.
@@ -112,9 +128,8 @@ Particularly when using the environment variables feature, note the differences 
 Windows uses `DllMain` and thus the host process is already executing when the runtime is injected. Changed environment 
 variables will thus be visible to the host process only if they are read **after** initialization.
 
-Linux hooks `__libc_start_main` and bootstraps the .NET runtime **before** `main`, thus any environment variables set will **always** be visible
+Linux hooks `__libc_start_main` and bootstraps the .NET runtime **before** `main`, thus any environment variables set **may** be visible
 to the target process `main`.
 
-On both platforms, .NET initialization and execution happens on a separate thread. 
-However, if an uncaught exception occurs it is not allowed to cross the FFI boundary. 
-To avoid undefined behaviour, the host application will be aborted.
+On both platforms, .NET initialization and execution happens on a separate thread. However, if an uncaught exception occurs 
+it is not allowed to cross the FFI boundary. To avoid undefined behaviour, the host application will be aborted.
