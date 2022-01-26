@@ -1,11 +1,12 @@
 use std::env::current_exe;
 use std::error::Error;
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::fmt::{Display, Formatter};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::{FromStr, Lines};
 
 use netcorehost::pdcstring::PdCString;
+use crate::config::AdditionalParameter::{DotNetRoot, EnvironmentVariable, Hostfxr};
 
 #[derive(Debug)]
 pub struct LoadConfig {
@@ -13,8 +14,7 @@ pub struct LoadConfig {
     pub type_name: PdCString,
     pub entry_method: PdCString,
     pub entry_assembly: PdCString,
-    pub env_vars: Vec<(OsString, OsString)>,
-    pub hostfxr: Option<PathBuf>,
+    pub additional_params: Vec<AdditionalParameter>,
 }
 
 #[derive(Debug)]
@@ -22,6 +22,13 @@ pub enum ConfigError {
     MissingOrInvalidConfigMagic(Option<String>),
     InvalidConfig,
     MissingConfig
+}
+
+#[derive(Debug)]
+pub enum AdditionalParameter {
+    EnvironmentVariable(OsString, OsString),
+    Hostfxr(PathBuf),
+    DotNetRoot(PathBuf)
 }
 
 pub trait ConfigSearchPath {
@@ -62,8 +69,8 @@ impl Error for ConfigError {}
 
 impl LoadConfig {
     pub fn new(runtime_config: PdCString, entry_assembly: PdCString, type_name: PdCString, entry_method: PdCString,
-               env_vars: Vec<(OsString, OsString)>, hostfxr: Option<PathBuf>) -> LoadConfig {
-        LoadConfig { runtime_config, type_name, entry_method, entry_assembly, env_vars, hostfxr }
+               additional_params: Vec<AdditionalParameter>) -> LoadConfig {
+        LoadConfig { runtime_config, type_name, entry_method, entry_assembly, additional_params }
     }
 
     pub fn try_parse(root: PathBuf, input: &dyn AsRef<str>) -> Result<LoadConfig, Box<dyn Error>> {
@@ -80,6 +87,31 @@ impl LoadConfig {
             Some("kaku_l") => LoadConfig::parse_long(root, lines),
             x => Err(Box::new(ConfigError::MissingOrInvalidConfigMagic(x.map(String::from))))
         }
+    }
+
+    pub fn environment_variables(&self) -> impl Iterator<Item=(&OsStr, &OsStr)> {
+        self.additional_params.iter().filter_map(|p| match p {
+            AdditionalParameter::EnvironmentVariable(k, v) => {
+                Some((k.as_os_str(), v.as_os_str()))
+            }
+            _ => None
+        })
+    }
+
+    pub fn hostfxr_path(&self) -> Option<&Path> {
+        self.additional_params.iter()
+            .find_map(|f| match f {
+                AdditionalParameter::Hostfxr(p) => Some(p.as_path()),
+                _ => None
+            })
+    }
+
+    pub fn dotnetroot_path(&self) -> Option<&Path> {
+        self.additional_params.iter()
+            .find_map(|f| match f {
+                AdditionalParameter::DotNetRoot(p) => Some(p.as_path()),
+                _ => None
+            })
     }
 
     fn parse_long(root: PathBuf, input: Lines) -> Result<LoadConfig, Box<dyn Error>> {
@@ -100,25 +132,14 @@ impl LoadConfig {
         let mut assembly_fname_path = PathBuf::from(root);
         assembly_fname_path.push(assembly_fname);
 
-        let hostfxr = if let Some(next) = lines.get(4) {
-            if next.starts_with("hostfxr ") {
-                let mut buf = PathBuf::from(root);
-                buf.push(&next["hostfxr ".len()..]);
-                Some(buf)
-            } else {
-                None
-            }
-        } else { None };
-
-        let envvars = Self::parse_env(&lines[4..]);
+        let additional = Self::parse_additional(&root, &lines[4..]);
 
         Ok(LoadConfig::new(
             PdCString::from_os_str(runtime_config_path.as_os_str())?,
             PdCString::from_os_str(assembly_fname_path.as_os_str())?,
             PdCString::from_str(entry_type)?,
             PdCString::from_str(entry_fn)?,
-            envvars,
-            hostfxr
+            additional
         ))
     }
 
@@ -136,46 +157,48 @@ impl LoadConfig {
         assembly_fname_path.push(&format!("{}.dll", asm));
 
         let lines: Vec<&str> = input.collect();
-
-        let hostfxr = if let Some(next) = lines.get(0) {
-            if next.starts_with("hostfxr ") {
-                let mut buf = PathBuf::from(root);
-                buf.push(&next["hostfxr ".len()..]);
-                Some(buf)
-            } else {
-                None
-            }
-        } else { None };
-
-        let envvars = Self::parse_env(&lines);
+        let additional = Self::parse_additional(&root, &lines);
         Ok(LoadConfig::new(
             PdCString::from_os_str(runtime_config_path.as_os_str())?,
             PdCString::from_os_str(assembly_fname_path.as_os_str())?,
             PdCString::from_str(&format!("{}, {}", entry_cls, asm))?,
             PdCString::from_str(entry_fn)?,
-            envvars,
-            hostfxr
+            additional
         ))
     }
 
-    fn parse_env(input: &[&str]) -> Vec<(OsString, OsString)> {
-        let mut vars = Vec::new();
+    fn parse_additional(root: &Path, input: &[&str]) -> Vec<AdditionalParameter> {
+        let mut map = Vec::new();
 
         for line in input {
-            if !line.starts_with("env ") { continue; }
-            let line = &line["env ".len()..];
-            if let Some((k, v)) = line.split_once("=") {
-                vars.push((OsString::from(k), OsString::from(v)))
+            match line.split_once(" ") {
+                Some(("env", env)) => {
+                    if let Some((k, v)) = env.split_once("=") {
+                        map.push(EnvironmentVariable(OsString::from(k), OsString::from(v)));
+                    }
+                }
+                Some(("hostfxr", hostfxr)) => {
+                    let mut buf = PathBuf::from(root);
+                    buf.push(hostfxr);
+                    map.push(Hostfxr(buf));
+                }
+                Some(("dotnetroot", dotnetroot)) => {
+                    let mut buf = PathBuf::from(root);
+                    buf.push(dotnetroot);
+                    map.push(DotNetRoot(buf));
+                }
+                _ => {}
             }
         }
-        vars
+
+        map
     }
 }
 
 #[cfg(test)]
 mod tests {
     use std::ffi::OsString;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::str::FromStr;
     use netcorehost::pdcstr;
     use crate::LoadConfig;
@@ -189,64 +212,33 @@ Assembly::TestInject.EntryPoint$Main";
         assert_eq!(config.type_name.as_ref(), pdcstr!("TestInject.EntryPoint, Assembly"));
         assert_eq!(config.entry_assembly.as_ref(), pdcstr!("Assembly.dll"));
         assert_eq!(config.entry_method.as_ref(), pdcstr!("Main"));
-        assert_eq!(config.env_vars.len(), 0);
-        assert_eq!(config.hostfxr, None);
+        assert_eq!(config.additional_params.len(), 0);
     }
 
     #[test]
-    fn test_parse_short_env() {
-        let kaku_co = "kaku_s
-Assembly::TestInject.EntryPoint$Main
-env TESTENV=TEST
-env TESTENV2=TEST2
-";
-        let config = LoadConfig::try_parse(PathBuf::from("kaku.co"), &kaku_co).unwrap();
-        assert_eq!(config.runtime_config.as_ref(), pdcstr!("Assembly.runtimeconfig.json"));
-        assert_eq!(config.type_name.as_ref(), pdcstr!("TestInject.EntryPoint, Assembly"));
-        assert_eq!(config.entry_assembly.as_ref(), pdcstr!("Assembly.dll"));
-        assert_eq!(config.entry_method.as_ref(), pdcstr!("Main"));
-        assert_eq!(config.env_vars, vec![
-            (OsString::from_str("TESTENV").unwrap(), OsString::from_str("TEST").unwrap()),
-            (OsString::from_str("TESTENV2").unwrap(), OsString::from_str("TEST2").unwrap())
-        ]);
-        assert_eq!(config.hostfxr, None);
-    }
-    #[test]
-    fn test_parse_short_env_hostfxr() {
+    fn test_parse_short_params() {
         let kaku_co = "kaku_s
 Assembly::TestInject.EntryPoint$Main
 hostfxr HOSTFX
 env TESTENV=TEST
 env TESTENV2=TEST2
+dotnetroot DOTNETROOT
 ";
         let config = LoadConfig::try_parse(PathBuf::from("kaku.co"), &kaku_co).unwrap();
         assert_eq!(config.runtime_config.as_ref(), pdcstr!("Assembly.runtimeconfig.json"));
         assert_eq!(config.type_name.as_ref(), pdcstr!("TestInject.EntryPoint, Assembly"));
         assert_eq!(config.entry_assembly.as_ref(), pdcstr!("Assembly.dll"));
         assert_eq!(config.entry_method.as_ref(), pdcstr!("Main"));
-        assert_eq!(config.env_vars, vec![
-            (OsString::from_str("TESTENV").unwrap(), OsString::from_str("TEST").unwrap()),
-            (OsString::from_str("TESTENV2").unwrap(), OsString::from_str("TEST2").unwrap())
+        assert_eq!(config.environment_variables().collect::<Vec<_>>(), vec![
+            (OsString::from_str("TESTENV").unwrap().as_os_str(), OsString::from_str("TEST").unwrap().as_os_str()),
+            (OsString::from_str("TESTENV2").unwrap().as_os_str(), OsString::from_str("TEST2").unwrap().as_os_str())
         ]);
-        assert_eq!(config.hostfxr, Some(PathBuf::from("HOSTFX")));
-    }
-    #[test]
-    fn test_parse_short_hostfxr() {
-        let kaku_co = "kaku_s
-Assembly::TestInject.EntryPoint$Main
-hostfxr HOSTFX
-";
-        let config = LoadConfig::try_parse(PathBuf::from("kaku.co"), &kaku_co).unwrap();
-        assert_eq!(config.runtime_config.as_ref(), pdcstr!("Assembly.runtimeconfig.json"));
-        assert_eq!(config.type_name.as_ref(), pdcstr!("TestInject.EntryPoint, Assembly"));
-        assert_eq!(config.entry_assembly.as_ref(), pdcstr!("Assembly.dll"));
-        assert_eq!(config.entry_method.as_ref(), pdcstr!("Main"));
-        assert_eq!(config.env_vars.len(), 0);
-        assert_eq!(config.hostfxr, Some(PathBuf::from("HOSTFX")));
+        assert_eq!(config.hostfxr_path(), Some(Path::new("HOSTFX")));
+        assert_eq!(config.dotnetroot_path(), Some(Path::new("DOTNETROOT")));
     }
 
     #[test]
-    fn test_long_short() {
+    fn test_parse_long() {
         let kaku_co = "kaku_l
 Assembly.runtimeconfig.json
 Assembly.dll
@@ -257,33 +249,11 @@ Main";
         assert_eq!(config.type_name.as_ref(), pdcstr!("TestInject.EntryPoint, Assembly"));
         assert_eq!(config.entry_assembly.as_ref(), pdcstr!("Assembly.dll"));
         assert_eq!(config.entry_method.as_ref(), pdcstr!("Main"));
-        assert_eq!(config.env_vars.len(), 0);
-        assert_eq!(config.hostfxr, None);
+        assert_eq!(config.additional_params.len(), 0);
     }
 
     #[test]
-    fn test_parse_long_env() {
-        let kaku_co = "kaku_l
-Assembly.runtimeconfig.json
-Assembly.dll
-TestInject.EntryPoint, Assembly
-Main
-env TESTENV=TEST
-env TESTENV2=TEST2
-";
-        let config = LoadConfig::try_parse(PathBuf::from("kaku.co"), &kaku_co).unwrap();
-        assert_eq!(config.runtime_config.as_ref(), pdcstr!("Assembly.runtimeconfig.json"));
-        assert_eq!(config.type_name.as_ref(), pdcstr!("TestInject.EntryPoint, Assembly"));
-        assert_eq!(config.entry_assembly.as_ref(), pdcstr!("Assembly.dll"));
-        assert_eq!(config.entry_method.as_ref(), pdcstr!("Main"));
-        assert_eq!(config.env_vars, vec![
-            (OsString::from_str("TESTENV").unwrap(), OsString::from_str("TEST").unwrap()),
-            (OsString::from_str("TESTENV2").unwrap(), OsString::from_str("TEST2").unwrap())
-        ]);
-        assert_eq!(config.hostfxr, None);
-    }
-    #[test]
-    fn test_parse_long_env_hostfxr() {
+    fn test_parse_long_params() {
         let kaku_co = "kaku_l
 Assembly.runtimeconfig.json
 Assembly.dll
@@ -292,33 +262,18 @@ Main
 hostfxr HOSTFX
 env TESTENV=TEST
 env TESTENV2=TEST2
+dotnetroot DOTNETROOT
 ";
-        let config = LoadConfig::try_parse(PathBuf::from("kaku.co"), &kaku_co).unwrap();
-        assert_eq!(config.runtime_config.as_ref(), pdcstr!("Assembly.runtimeconfig.json"));
+        let config = LoadConfig::try_parse(PathBuf::from("/kaku.co"), &kaku_co).unwrap();
+        assert_eq!(config.runtime_config.as_ref(), pdcstr!("/Assembly.runtimeconfig.json"));
         assert_eq!(config.type_name.as_ref(), pdcstr!("TestInject.EntryPoint, Assembly"));
-        assert_eq!(config.entry_assembly.as_ref(), pdcstr!("Assembly.dll"));
+        assert_eq!(config.entry_assembly.as_ref(), pdcstr!("/Assembly.dll"));
         assert_eq!(config.entry_method.as_ref(), pdcstr!("Main"));
-        assert_eq!(config.env_vars, vec![
-            (OsString::from_str("TESTENV").unwrap(), OsString::from_str("TEST").unwrap()),
-            (OsString::from_str("TESTENV2").unwrap(), OsString::from_str("TEST2").unwrap())
+        assert_eq!(config.environment_variables().collect::<Vec<_>>(), vec![
+            (OsString::from_str("TESTENV").unwrap().as_os_str(), OsString::from_str("TEST").unwrap().as_os_str()),
+            (OsString::from_str("TESTENV2").unwrap().as_os_str(), OsString::from_str("TEST2").unwrap().as_os_str())
         ]);
-        assert_eq!(config.hostfxr, Some(PathBuf::from("HOSTFX")));
-    }
-    #[test]
-    fn test_parse_long_hostfxr() {
-        let kaku_co = "kaku_l
-Assembly.runtimeconfig.json
-Assembly.dll
-TestInject.EntryPoint, Assembly
-Main
-hostfxr HOSTFX
-";
-        let config = LoadConfig::try_parse(PathBuf::from("kaku.co"), &kaku_co).unwrap();
-        assert_eq!(config.runtime_config.as_ref(), pdcstr!("Assembly.runtimeconfig.json"));
-        assert_eq!(config.type_name.as_ref(), pdcstr!("TestInject.EntryPoint, Assembly"));
-        assert_eq!(config.entry_assembly.as_ref(), pdcstr!("Assembly.dll"));
-        assert_eq!(config.entry_method.as_ref(), pdcstr!("Main"));
-        assert_eq!(config.env_vars.len(), 0);
-        assert_eq!(config.hostfxr, Some(PathBuf::from("HOSTFX")));
+        assert_eq!(config.hostfxr_path(), Some(Path::new("/HOSTFX")));
+        assert_eq!(config.dotnetroot_path(), Some(Path::new("/DOTNETROOT")));
     }
 }

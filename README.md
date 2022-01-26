@@ -61,8 +61,9 @@ zombie processes. If there seems to be such a need, please file an issue; I will
 ## Configuration
 
 To determine the .NET bootstrap point, sabinokaku requires a `kaku.co` file either in the same directory as `kaku.dll`/`libkaku.so`, 
-or in the host process directory. There are 2 formats that sabinokaku understands. The long format (`kaku_l`) allows for the most flexibility
-if you have weird AssemblyConfig options, or store the .NET entry point in a child folder, but the short format is generally preferred. 
+or in the host process directory. `kaku.co` contains the preamble necessary for sabinokaku to bootstrap the .NET runtime. There are 2
+preamble formats that sabinokaku understands. The long format (`kaku_l`) allows for the most flexibility, for example if you
+store the .NET entry point assembly in a child folder. The short form may be preferred for its shorter syntax.
 
 ### Long Format Preamble
 The long format always begins with `kaku_l`, followed by the path to `runtimeconfig.json`, the path to the .NET assembly DLL, 
@@ -88,7 +89,7 @@ TestInject::TestInject.EntryPoint$Main
 ### Advanced Configuration
 
 #### Setting Environment Variables
-After the long or short format preamble, you may provide **optional** environment variables to be set before hostfxr is invoked and the .NET runtime is bootstrapped.
+After the preamble, you may provide **optional** environment variables to be set before hostfxr is invoked and the .NET runtime is bootstrapped.
 The format is `env KEY=VAR`, be sure there are no spaces between the equals symbol or it will be taken as part of the environment string.
 
 For example, to set `DOTNET_MULTILEVEL_LOOKUP=0`, an example `kaku.co` may be
@@ -114,7 +115,7 @@ Any set variables will also take effect against the hosting process after initia
 See [Platform Differences](#platform-differences) for more details.
 
 #### Providing your own `hostfxr.dll`
-After the preamble, but **before** any environment variables, you may **optionally** provide the path to your own `hostfxr.dll`, which is resolved
+After the preamble, you may **optionally** provide the path to your own `hostfxr.dll`, which is resolved
 relative to `kaku.co`.
 
 ```
@@ -125,6 +126,22 @@ env DOTNET_MULTILEVEL_LOOKUP=0
 ```
 
 sabinokaku will then try to load using your custom `hostfxr.dll`. If it does not exist, the runtime will fail to bootstrap.
+If you specify `hostfxr` multiple times, only the first entry is taken.
+
+#### Specifying a runtime
+After the preamble, you may **optionally** provide the path to a dotnet root folder containing a `dotnet.exe` and a .NET
+runtime, relative to `kaku.co`. Be sure to set `DOTNET_MULTILEVEL_LOOKUP=0` as well.
+
+```
+kaku_s
+TestInject::TestInject.EntryPoint$Main
+dotnetroot runtime
+env DOTNET_MULTILEVEL_LOOKUP=0
+```
+
+sabinokaku will then try to load the runtime specified.
+
+If you specify `dotnetroot` multiple times, only the first entry is taken.
 
 ## Platform Differences
 Particularly when using the environment variables feature, note the differences in load order between Windows and Linux.
