@@ -20,7 +20,7 @@ actual assembly that has to be injected into the address space of the target pro
 dumps environment variables for testing injection on Linux.
 
 ## Usage
-1. Create a class library project for use as your entry point, and add `<GenerateRuntimeConfigurationFiles>True</GenerateRuntimeConfigurationFiles>` to the csproj to properly generate the runtime configuration. 
+1. Create a class library project for use as your entry point, and add `<EnableDynamicLoading>True</EnableDynamicLoading>` to the csproj to properly generate the runtime configuration. 
 2. The entry point in .NET must always have the signature `public static int Main(IntPtr args, int sizeBytes)`. 
 3. Create a `kaku.co` file, see [Configuration](#configuration) for syntax, and add it to your project.
 4. Add a prebuilt binary of `kaku.dll` on Windows, or `libkaku.so` on Linux.
