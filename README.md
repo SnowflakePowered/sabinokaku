@@ -29,7 +29,7 @@ Your csproj should have the following entries.
 
 ```xml
 <PropertyGroup>
-  <GenerateRuntimeConfigurationFiles>True</GenerateRuntimeConfigurationFiles>
+  <EnableDynamicLoading>true</EnableDynamicLoading>
 </PropertyGroup>
 <ItemGroup>
   <None Update="kaku.co">
