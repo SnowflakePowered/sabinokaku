@@ -11,8 +11,13 @@ repository = "https://github.com/SnowflakePowered/sabinokaku"
 description = "Minimal framework for injecting the .NET runtime into processes."
 build = "build.rs"
 
+[features]
+default = ["vulkan"]
+vulkan = ["ash"]
+
 [dependencies]
 sabinokaku-common = { version = "0.1", path = "../sabinokaku-common" }
+ash = { version = "0.35", optional = true}
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winapi = { version = "0.3", features = ["winuser", "consoleapi", "errhandlingapi"]}

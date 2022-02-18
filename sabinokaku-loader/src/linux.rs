@@ -35,12 +35,28 @@ const LIBC_START_MAIN: &'static [u8] = b"__libc_start_main\0";
 extern "system" fn thunked_main(argc: c_int, argv: *mut *mut c_char, envp: *mut *mut c_char) -> c_int {
     // We don't wait for the thread. This is consistent with windows behaviour.
     std::thread::spawn(|| {
-        match crate::main() {
+        let config = match crate::get_config() {
+            Ok(config) => config,
+            Err(e) => {
+                eprintln!("[libc_inject] Error occurred when injecting CLR: {}", e);
+                return 1
+            }
+        };
+
+        if let Some(true) = std::env::var_os("ENABLE_SABINOKAKU_VULKAN").map(|s| s == OsStr::new("1")) {
+            println!("[libc_inject] Vulkan env enabled.");
+            if config.vulkan().is_some() {
+                println!("[libc_inject] Vulkan config detected, disabling load entry.");
+                return 0
+            }
+        }
+
+        match crate::boot_clr::<()>(config,None) {
             Ok(i) => {
                 i as u32
             }
             Err(e) => {
-                eprintln!("Error occurred when injecting CLR: {}", e);
+                eprintln!("[libc_inject] Error occurred when injecting CLR: {}", e);
                 1 as u32
             }
         }
@@ -51,7 +67,7 @@ extern "system" fn thunked_main(argc: c_int, argv: *mut *mut c_char, envp: *mut 
     } else {
         // this should never happen but might as well exit if somehow we get launched into
         // here without main.
-        eprintln!("No valid main entrypoint to inject into found.");
+        eprintln!("[libc_inject] No valid main entrypoint to inject into found.");
         1
     };
 

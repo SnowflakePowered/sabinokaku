@@ -1,0 +1,20 @@
+{
+  "file_format_version" : "1.2.0",
+  "layer": {
+    "name": "VK_LAYER_SABINOKAKU_injection",
+    "type": "GLOBAL",
+    "library_path": "D:\\coding\\sabitsuku\\target\\debug\\kaku.dll",
+    "api_version" : "1.2.198",
+    "implementation_version" : "1",
+    "description" : "sabinokaku injection layer",
+    "functions": {
+      "vkNegotiateLoaderLayerInterfaceVersion": "sabinokaku_negotiate_layer_version"
+    },
+    "enable_environment": {
+      "ENABLE_SABINOKAKU_VULKAN": "1"
+    },
+    "disable_environment": {
+      "DISABLE_SABINOKAKU_VULKAN": "1"
+    }
+  }
+}

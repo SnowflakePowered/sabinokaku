@@ -1,5 +1,2 @@
-kaku_l
-TestInject.runtimeconfig.json
-TestInject.dll
-TestInject.EntryPoint, TestInject
-Main
+kaku_s
+TestInject::TestInject.EntryPoint!Main

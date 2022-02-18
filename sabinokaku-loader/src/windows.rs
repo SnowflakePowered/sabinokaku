@@ -1,6 +1,6 @@
 #![cfg(all(target_os = "windows"))]
 
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::os::windows::ffi::OsStringExt;
 use std::path::PathBuf;
 
@@ -53,11 +53,28 @@ pub extern "system" fn DllMain(
 
     if call_reason == DLL_PROCESS_ATTACH {
         std::thread::spawn(|| {
-            match crate::main() {
+            let config = match crate::get_config() {
+                Ok(config) => config,
+                Err(e) => {
+                    unsafe { winapi::um::consoleapi::AllocConsole(); }
+                    eprintln!("[dllmain_inject] Error occurred when parsing config: {}", e);
+                    return 1
+                }
+            };
+
+            if let Some(true) = std::env::var_os("ENABLE_SABINOKAKU_VULKAN").map(|s| s == OsStr::new("1")) {
+                eprintln!("[dllmain_inject] Vulkan env enabled.");
+                if config.vulkan().is_some() {
+                    eprintln!("[dllmain_inject] Vulkan config detected, disabling load entry.");
+                    return 0
+                }
+            }
+
+            match crate::boot_clr::<()>(config, None) {
                 Ok(i) => i as u32,
                 Err(e) => {
                     unsafe { winapi::um::consoleapi::AllocConsole(); }
-                    println!("Error occurred when injecting CLR: {}", e);
+                    eprintln!("[dllmain_inject] Error occurred when injecting CLR: {}", e);
                     1
                 }
             }

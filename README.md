@@ -111,7 +111,7 @@ The order of environment variables set is **not guaranteed**.
 ⚠️**Warning**⚠️
 
 Any set variables will also take effect against the hosting process after initialization, and sabinokaku will not restore the prior values. 
-See [Platform Differences](#platform-differences) for more details.
+See [Platform Differences](#platform-differences) for more details. 
 
 #### Providing your own `hostfxr.dll`
 After the preamble, you may **optionally** provide the path to your own `hostfxr.dll`, which is resolved
@@ -141,6 +141,38 @@ env DOTNET_MULTILEVEL_LOOKUP=0
 sabinokaku will then try to load the runtime specified.
 
 If you specify `dotnetroot` multiple times, only the first entry is taken.
+
+#### Vulkan Hooking
+
+sabinokaku provides specialized functionality for initializing the CLR for Vulkan hooking purposes as a layer. Your Vulkan
+driver must support layer interface 2 (Vulkan 1.1). 
+
+To load the CLR during Vulkan instantiation, you must enable it by setting the `vulkan` option in your `kaku.co`. You 
+must specify a loader layer library version (must be greater than 2, or the layer will not load), and an entry point for the
+runtime, either `CreateDevice` (called at first `vkCreateDevice`), or `CreateInstance` (called at first `vkCreateInstance`).
+
+You must also set the environment variable `ENABLE_SABINOKAKU_VULKAN=1`, this will also enable the layer with the included `layer.json`
+manifest. This will disable injection via `DllMain` or `_libc_start_main`.
+
+```
+kaku_s
+TestInject::TestInject.EntryPoint!Main
+vulkan 2 CreateDevice
+```
+
+You may then configure `kaku.dll` or `libkaku.so` as a Vulkan layer. See [the Vulkan documentation](https://vulkan.lunarg.com/doc/view/1.3.204.0/windows/loader_and_layer_interface.html#user-content-layer-manifest-file-format)
+for more information.
+
+On the first load of the layer, sabinokaku will pass a Vulkan handle of the initialized `VkInstance` or `VkDevice` as the arguments
+to the .NET entry point. `VkInstance*` will **always** be the first handle passed. If `CreateDevice` is the entrypoint, `VkDevice*` will
+be the second pointer passed. The memory ownership of the handles passed will become the CLRs, but since the allocator
+is unknown in the managed context, it should be considered leaked memory.
+
+sabinokaku will initialize the CLR **only on the first** calls to the layer function. To hook subsequent calls to `vkCreateInstance` or
+`vkCreateDevice`, you must do so manually in managed code and hook the calls at the loader level. The returned pointers to `VkInstance` and
+`VkDevice` can be used for hooking the instance or device call chain but **must** be updated if the Vulkan instance or device is recreated. If
+an application creates multiple instances or devices in a short timeframe before managed code can hook, you will not be able to hook into
+the subsequent call chains.
 
 ## Platform Differences
 Particularly when using the environment variables feature, note the differences in load order between Windows and Linux.

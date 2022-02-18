@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::ffi::c_void;
 use netcorehost::hostfxr::Hostfxr;
 
 use netcorehost::nethost;
@@ -13,7 +14,7 @@ pub mod prelude {
     pub use crate::init_clr;
 }
 
-pub fn init_clr(config: LoadConfig) -> Result<i32, Box<dyn Error>> {
+pub fn init_clr<T>(config: LoadConfig, args: Option<Vec<T>>) -> Result<i32, Box<dyn Error>> {
     for (key, value) in config.environment_variables() {
         std::env::set_var(key, value);
     }
@@ -33,5 +34,15 @@ pub fn init_clr(config: LoadConfig) -> Result<i32, Box<dyn Error>> {
 
     let loader = context.get_delegate_loader_for_assembly(&config.entry_assembly)?;
     let init = loader.get_function_pointer_with_default_signature(config.type_name, config.entry_method)?;
-    Ok(unsafe { init(std::ptr::null(), 0) })
+
+    if let Some(mut args) = args {
+        args.shrink_to_fit();
+        let len = args.len();
+        let refs = args.leak();
+        Ok(unsafe {
+            init(refs.as_mut_ptr() as *const c_void, len)
+        })
+    } else {
+        Ok(unsafe { init(std::ptr::null(), 0) })
+    }
 }

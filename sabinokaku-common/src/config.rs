@@ -6,9 +6,9 @@ use std::path::{Path, PathBuf};
 use std::str::{FromStr, Lines};
 
 use netcorehost::pdcstring::PdCString;
-use crate::config::AdditionalParameter::{DotNetRoot, EnvironmentVariable, Hostfxr};
+use crate::config::AdditionalParameter::{DotNetRoot, EnvironmentVariable, Hostfxr, Vulkan};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LoadConfig {
     pub runtime_config: PdCString,
     pub type_name: PdCString,
@@ -24,11 +24,24 @@ pub enum ConfigError {
     MissingConfig
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VulkanEntryPoint {
+    CreateDevice,
+    CreateInstance
+}
+
+#[derive(Debug, Clone)]
 pub enum AdditionalParameter {
     EnvironmentVariable(OsString, OsString),
     Hostfxr(PathBuf),
-    DotNetRoot(PathBuf)
+    DotNetRoot(PathBuf),
+    Vulkan(VulkanInitParams)
+}
+
+#[derive(Debug, Clone)]
+pub struct VulkanInitParams {
+    pub loader_version: u32,
+    pub entry: VulkanEntryPoint
 }
 
 pub trait ConfigSearchPath {
@@ -114,6 +127,14 @@ impl LoadConfig {
             })
     }
 
+    pub fn vulkan(&self) -> Option<&VulkanInitParams> {
+        self.additional_params.iter()
+            .find_map(|f| match f {
+                AdditionalParameter::Vulkan(vep) => Some(vep),
+                _ => None
+            })
+    }
+
     fn parse_long(root: PathBuf, input: Lines) -> Result<LoadConfig, Box<dyn Error>> {
         let lines: Vec<&str> = input.collect();
         if lines.len() < 4 {
@@ -187,6 +208,18 @@ impl LoadConfig {
                     buf.push(dotnetroot);
                     map.push(DotNetRoot(buf));
                 }
+                Some(("vulkan", vulkan)) => {
+                    if let Some((ld, entry)) = vulkan.split_once(" ") {
+                        if let Ok(ld) = ld.parse() {
+                            let entry_point = match entry {
+                                "CreateInstance" | "vkCreateInstance" => VulkanEntryPoint::CreateInstance,
+                                "CreateDevice" | "vkCreateDevice" => VulkanEntryPoint::CreateDevice,
+                                _ => continue
+                            };
+                            map.push(Vulkan(VulkanInitParams { loader_version: ld, entry: entry_point }))
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -206,7 +239,7 @@ mod tests {
     #[test]
     fn test_parse_short() {
         let kaku_co = "kaku_s
-Assembly::TestInject.EntryPoint$Main";
+Assembly::TestInject.EntryPoint!Main";
         let config = LoadConfig::try_parse(PathBuf::from("kaku.co"), &kaku_co).unwrap();
         assert_eq!(config.runtime_config.as_ref(), pdcstr!("Assembly.runtimeconfig.json"));
         assert_eq!(config.type_name.as_ref(), pdcstr!("TestInject.EntryPoint, Assembly"));
@@ -218,7 +251,7 @@ Assembly::TestInject.EntryPoint$Main";
     #[test]
     fn test_parse_short_params() {
         let kaku_co = "kaku_s
-Assembly::TestInject.EntryPoint$Main
+Assembly::TestInject.EntryPoint!Main
 hostfxr HOSTFX
 env TESTENV=TEST
 env TESTENV2=TEST2
