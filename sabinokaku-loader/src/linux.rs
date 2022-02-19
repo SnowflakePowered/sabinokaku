@@ -43,11 +43,13 @@ extern "system" fn thunked_main(argc: c_int, argv: *mut *mut c_char, envp: *mut 
             }
         };
 
-        if let Some(true) = std::env::var_os("ENABLE_SABINOKAKU_VULKAN").map(|s| s == OsStr::new("1")) {
-            println!("[libc_inject] Vulkan env enabled.");
-            if config.vulkan().is_some() {
-                println!("[libc_inject] Vulkan config detected, disabling load entry.");
-                return 0
+        #[cfg(feature = "vulkan")] {
+            if let Some(true) = std::env::var_os("ENABLE_SABINOKAKU_VULKAN").map(|s| s == OsStr::new("1")) {
+                println!("[libc_inject] Vulkan env enabled.");
+                if config.vulkan().is_some() {
+                    println!("[libc_inject] Vulkan config detected, disabling load entry.");
+                    return 0
+                }
             }
         }
 

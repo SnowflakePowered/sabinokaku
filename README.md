@@ -158,6 +158,7 @@ manifest. This will disable injection via `DllMain` or `_libc_start_main`.
 kaku_s
 TestInject::TestInject.EntryPoint!Main
 vulkan 2 CreateDevice
+env SABINOKAKU_VULKAN_BOOTED=1
 ```
 
 You may then configure `kaku.dll` or `libkaku.so` as a Vulkan layer. See [the Vulkan documentation](https://vulkan.lunarg.com/doc/view/1.3.204.0/windows/loader_and_layer_interface.html#user-content-layer-manifest-file-format)
@@ -173,6 +174,9 @@ sabinokaku will initialize the CLR **only on the first** calls to the layer func
 `VkDevice` can be used for hooking the instance or device call chain but **must** be updated if the Vulkan instance or device is recreated. If
 an application creates multiple instances or devices in a short timeframe before managed code can hook, you will not be able to hook into
 the subsequent call chains.
+
+Because the Vulkan loader will **reinitialize all layers** on device recreation, you must also include `env SABINOKAKU_VULKAN_BOOTED=1` in your `kaku.co`
+to prevent the layer from being reinitialized (and thus CLR) on device recreation.
 
 ## Platform Differences
 Particularly when using the environment variables feature, note the differences in load order between Windows and Linux.

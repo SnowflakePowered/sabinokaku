@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::ffi::{c_void, CStr};
+use std::ffi::{c_void, CStr, OsStr};
 use std::lazy::{SyncLazy, SyncOnceCell};
 use std::sync::RwLock;
 use ash::vk;
@@ -302,9 +302,22 @@ fn clr_entry_point(handles: Vec<u64>) {
 
 #[no_mangle]
 pub unsafe extern "system" fn sabinokaku_negotiate_layer_version(interface: *mut VkNegotiateLayerInterface) -> vk::Result {
+    // unsafe { winapi::um::consoleapi::AllocConsole(); }
+
     if (*interface).s_type != VkLayerNegotiateStructType::LAYER_NEGOTIATE_INTERFACE_STRUCT {
         return Result::ERROR_INITIALIZATION_FAILED;
     }
+
+    if let Some(true) = std::env::var_os("SABINOKAKU_VULKAN_BOOTED").map(|s| s == OsStr::new("1")) {
+        eprintln!("[dllmain_inject] Vulkan env already initialized.");
+        return Result::ERROR_INITIALIZATION_FAILED;
+    }
+
+    // Do not allow reinitialization.
+    if FIRST_INSTANCE.get().is_some() {
+        return Result::ERROR_INITIALIZATION_FAILED;
+    }
+
     let target_ld = (*interface).loader_layer_interface_version;
 
     if target_ld < 2 {
@@ -333,6 +346,6 @@ pub unsafe extern "system" fn sabinokaku_negotiate_layer_version(interface: *mut
         println!("Negotiate OK {:?}\n IPA {:p}\n {:p}", LOAD_CONFIG.get(), (*interface).pfn_get_instance_proc_addr as *const (),  (*interface).pfn_get_device_proc_addr as *const ());
         return Result::SUCCESS
     }
-
+    println!("failed vulkan");
     Result::ERROR_INITIALIZATION_FAILED
 }

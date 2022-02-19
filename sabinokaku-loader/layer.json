@@ -3,7 +3,7 @@
   "layer": {
     "name": "VK_LAYER_SABINOKAKU_injection",
     "type": "GLOBAL",
-    "library_path": "D:\\coding\\sabitsuku\\target\\debug\\kaku.dll",
+    "library_path": "D:\\coding\\snowflake\\src\\Snowflake.Support.Orchestration.Overlay.Runtime.Windows\\bin\\Debug\\net6.0\\kaku-vk.dll",
     "api_version" : "1.2.198",
     "implementation_version" : "1",
     "description" : "sabinokaku injection layer",

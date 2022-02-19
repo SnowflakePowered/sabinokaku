@@ -50,7 +50,6 @@ pub extern "system" fn DllMain(
     _reserved: LPVOID,
 ) -> BOOL {
     unsafe { DisableThreadLibraryCalls(module); }
-
     if call_reason == DLL_PROCESS_ATTACH {
         std::thread::spawn(|| {
             let config = match crate::get_config() {
@@ -61,12 +60,14 @@ pub extern "system" fn DllMain(
                     return 1
                 }
             };
-
-            if let Some(true) = std::env::var_os("ENABLE_SABINOKAKU_VULKAN").map(|s| s == OsStr::new("1")) {
-                eprintln!("[dllmain_inject] Vulkan env enabled.");
-                if config.vulkan().is_some() {
-                    eprintln!("[dllmain_inject] Vulkan config detected, disabling load entry.");
-                    return 0
+            
+            #[cfg(feature = "vulkan")] {
+                if let Some(true) = std::env::var_os("ENABLE_SABINOKAKU_VULKAN").map(|s| s == OsStr::new("1")) {
+                    eprintln!("[dllmain_inject] Vulkan env enabled.");
+                    if config.vulkan().is_some() {
+                        eprintln!("[dllmain_inject] Vulkan config detected, disabling load entry.");
+                        return 0
+                    }
                 }
             }
 
